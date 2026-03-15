@@ -1,0 +1,12 @@
+name = "lifestudio-api"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lifestudio-toyokawa"
+database_id = "563ab037-d0da-45c4-8859-3a66523fe1bb"
+
+[observability]
+enabled = true

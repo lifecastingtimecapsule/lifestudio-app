@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ライフスタジオ豊川 顧客分析</title>
+<style>
+:root{--bg:#0f172a;--bg2:#1e293b;--bg3:#334155;--accent:#6366f1;--accent2:#8b5cf6;--cyan:#06b6d4;--text:#f1f5f9;--muted:#94a3b8;--border:#334155;--green:#10b981;--yellow:#f59e0b;--red:#ef4444;--pink:#ec4899}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:14px}
+/* Loading */
+#loader{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;transition:opacity .4s}
+#loader.hidden{opacity:0;pointer-events:none}
+.spinner{width:48px;height:48px;border:4px solid var(--bg3);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:20px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-text{color:var(--muted);font-size:15px}
+/* Header */
+header{background:linear-gradient(135deg,var(--accent),var(--accent2));padding:18px 28px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:20px;font-weight:700}
+header .sub{color:rgba(255,255,255,.75);font-size:12px;margin-top:3px}
+.hbadge{background:rgba(255,255,255,.2);padding:5px 14px;border-radius:20px;font-size:12px;cursor:pointer;transition:.2s}
+.hbadge:hover{background:rgba(255,255,255,.3)}
+/* KPI bar */
+.kpi-bar{display:flex;gap:12px;padding:16px 28px;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.kpi{flex:1;min-width:120px;background:var(--bg3);border-radius:12px;padding:14px;text-align:center}
+.kpi .num{font-size:26px;font-weight:700;color:var(--cyan)}
+.kpi .lbl{font-size:11px;color:var(--muted);margin-top:3px}
+/* Nav */
+nav{background:var(--bg2);border-bottom:1px solid var(--border);display:flex;padding:0 16px;overflow-x:auto;white-space:nowrap}
+nav button{background:none;border:none;color:var(--muted);padding:13px 16px;cursor:pointer;font-size:13px;border-bottom:3px solid transparent;transition:.2s}
+nav button:hover{color:var(--text)}
+nav button.active{color:var(--cyan);border-bottom-color:var(--cyan);font-weight:600}
+/* Pages */
+.page{display:none;padding:22px 28px}
+.page.active{display:block}
+.section-title{font-size:17px;font-weight:700;margin-bottom:18px}
+/* Grid */
+.grid{display:grid;gap:18px}
+.g2{grid-template-columns:1fr 1fr}
+.g3{grid-template-columns:1fr 1fr 1fr}
+/* Card */
+.card{background:var(--bg2);border-radius:14px;padding:18px;border:1px solid var(--border)}
+.card h3{font-size:12px;color:var(--muted);margin-bottom:14px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.chart-wrap{position:relative}
+.chart-wrap.h240{height:240px}
+.chart-wrap.h300{height:300px}
+.chart-wrap.h320{height:320px}
+/* Table */
+.tbl-wrap{max-height:480px;overflow-y:auto;border-radius:10px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:var(--bg3);color:var(--muted);padding:9px 12px;text-align:left;font-weight:600;position:sticky;top:0;z-index:1}
+tbody tr{border-bottom:1px solid var(--border);transition:.1s}
+tbody tr:hover{background:var(--bg3)}
+tbody td{padding:8px 12px}
+/* Chips */
+.chip{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px;font-weight:600}
+.green{background:rgba(16,185,129,.2);color:var(--green)}
+.blue{background:rgba(6,182,212,.2);color:var(--cyan)}
+.purple{background:rgba(99,102,241,.2);color:var(--accent)}
+.red{background:rgba(239,68,68,.2);color:var(--red)}
+.yellow{background:rgba(245,158,11,.2);color:var(--yellow)}
+/* Search bar */
+.search-bar{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.search-bar input,.search-bar select{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-size:13px;flex:1;min-width:160px;outline:none}
+.search-bar input:focus,.search-bar select:focus{border-color:var(--cyan)}
+.count-label{color:var(--muted);font-size:12px;margin-bottom:8px}
+/* Pagination */
+.pagination{display:flex;gap:8px;margin-top:12px;align-items:center}
+.pagination button{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:5px 14px;border-radius:6px;cursor:pointer;font-size:13px}
+.pagination button:hover{background:var(--accent)}
+.pagination button:disabled{opacity:.4;cursor:not-allowed}
+.pagination .pg-info{color:var(--muted);font-size:13px}
+/* Responsive */
+@media(max-width:900px){.g2,.g3{grid-template-columns:1fr}.kpi-bar{gap:8px}.page{padding:14px}}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loader">
+  <div class="spinner"></div>
+  <div class="load-text">データを読み込んでいます...</div>
+</div>
+
+<!-- Header -->
+<header>
+  <div>
+    <h1>📸 ライフスタジオ豊川 顧客分析</h1>
+    <div class="sub" id="genDate"></div>
+  </div>
+  <div class="hbadge" onclick="refreshData()" title="データを再取得">🔄 更新</div>
+</header>
+
+<!-- KPI -->
+<div class="kpi-bar">
+  <div class="kpi"><div class="num" id="k1">-</div><div class="lbl">総顧客数</div></div>
+  <div class="kpi"><div class="num" id="k2">-</div><div class="lbl">総来店数</div></div>
+  <div class="kpi"><div class="num" id="k3">-</div><div class="lbl">リピーター率</div></div>
+  <div class="kpi"><div class="num" id="k4">-</div><div class="lbl">平均来店回数</div></div>
+  <div class="kpi"><div class="num" id="k5">-</div><div class="lbl">平均子供人数</div></div>
+  <div class="kpi"><div class="num" id="k6">-</div><div class="lbl">確定予約数</div></div>
+</div>
+
+<!-- Nav -->
+<nav>
+  <button class="active" onclick="showTab('visit',this)">📅 来店分析</button>
+  <button onclick="showTab('shoot',this)">📷 撮影種類</button>
+  <button onclick="showTab('child',this)">👶 子供分析</button>
+  <button onclick="showTab('repeat',this)">🔄 リピーター</button>
+  <button onclick="showTab('area',this)">📍 地域分析</button>
+  <button onclick="showTab('customers',this)">👥 顧客一覧</button>
+  <button onclick="showTab('visits_tbl',this)">📋 来店一覧</button>
+</nav>
+
+<!-- ===== 来店分析 ===== -->
+<div id="tab-visit" class="page active">
+  <div class="section-title">来店分析</div>
+  <div class="grid g2" style="margin-bottom:18px">
+    <div class="card"><h3>📆 月別来店数</h3><div class="chart-wrap h300"><canvas id="cMonthly"></canvas></div></div>
+    <div class="card"><h3>📅 曜日別来店数</h3><div class="chart-wrap h300"><canvas id="cDow"></canvas></div></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h3>⏰ 時間帯別来店数</h3><div class="chart-wrap h240"><canvas id="cHour"></canvas></div></div>
+    <div class="card"><h3>📊 来店回数分布</h3><div class="chart-wrap h240"><canvas id="cVisitDist"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ===== 撮影種類 ===== -->
+<div id="tab-shoot" class="page">
+  <div class="section-title">撮影種類分析</div>
+  <div class="grid g2" style="margin-bottom:18px">
+    <div class="card"><h3>🎯 撮影種類の割合</h3><div class="chart-wrap h320"><canvas id="cShootType"></canvas></div></div>
+    <div class="card"><h3>📷 カメラマン別（Top20）</h3><div class="chart-wrap h320"><canvas id="cPhoto"></canvas></div></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h3>📈 撮影種類 月トレンド</h3><div class="chart-wrap h240"><canvas id="cTypeTrend"></canvas></div></div>
+    <div class="card"><h3>✅ 予約ステータス</h3><div class="chart-wrap h240"><canvas id="cStatus"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ===== 子供分析 ===== -->
+<div id="tab-child" class="page">
+  <div class="section-title">子供分析</div>
+  <div class="grid g2" style="margin-bottom:18px">
+    <div class="card"><h3>👶 年齢分布（0〜12歳）</h3><div class="chart-wrap h300"><canvas id="cChildAge"></canvas></div></div>
+    <div class="card"><h3>🍼 月齢分布（0〜24ヶ月 ※現在年齢）</h3><div class="chart-wrap h300"><canvas id="cChildAge0"></canvas></div></div>
+  </div>
+  <div class="grid g3">
+    <div class="card"><h3>⚧ 性別</h3><div class="chart-wrap h240"><canvas id="cGender"></canvas></div></div>
+    <div class="card"><h3>👨‍👩‍👦 子供人数</h3><div class="chart-wrap h240"><canvas id="cNumKids"></canvas></div></div>
+    <div class="card"><h3>🎂 誕生月</h3><div class="chart-wrap h240"><canvas id="cBirthMonth"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ===== リピーター ===== -->
+<div id="tab-repeat" class="page">
+  <div class="section-title">リピーター分析</div>
+  <div class="grid g2" style="margin-bottom:18px">
+    <div class="card"><h3>🔄 新規 vs リピーター</h3><div class="chart-wrap h240"><canvas id="cRepeater"></canvas></div></div>
+    <div class="card"><h3>📊 撮影種類別 リピーター比率</h3><div class="chart-wrap h240"><canvas id="cRepeatType"></canvas></div></div>
+  </div>
+  <div class="card">
+    <h3>🏆 多来店顧客（3回以上）</h3>
+    <div class="tbl-wrap"><table id="tblRepeat">
+      <thead><tr><th>お名前</th><th>来店回数</th><th>撮影種類</th><th>子供1</th><th>地域</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ===== 地域分析 ===== -->
+<div id="tab-area" class="page">
+  <div class="section-title">地域分析</div>
+  <div class="grid g2">
+    <div class="card"><h3>🏙️ 市区町村別（Top20）</h3><div class="chart-wrap h320"><canvas id="cCity"></canvas></div></div>
+    <div class="card"><h3>📮 郵便番号 上3桁（Top20）</h3><div class="chart-wrap h320"><canvas id="cZip"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ===== 顧客一覧 ===== -->
+<div id="tab-customers" class="page">
+  <div class="section-title">顧客一覧</div>
+  <div class="search-bar">
+    <input type="text" id="custQ" placeholder="名前・電話・メールで検索..." oninput="debounce(loadCustomers,400)()">
+    <select id="custType" onchange="loadCustomers()"><option value="">撮影種類（すべて）</option></select>
+    <select id="custRep" onchange="loadCustomers()">
+      <option value="">全顧客</option><option value="1">リピーターのみ</option><option value="0">新規のみ</option>
+    </select>
+  </div>
+  <div class="count-label" id="custCount"></div>
+  <div class="tbl-wrap"><table id="tblCust">
+    <thead><tr><th>お名前</th><th>電話</th><th>地域</th><th>子供</th><th>来店回数</th><th>撮影種類</th><th>リピーター</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <div class="pagination">
+    <button id="custPrev" onclick="custPage--; loadCustomers()">◀ 前</button>
+    <span class="pg-info" id="custPgInfo"></span>
+    <button id="custNext" onclick="custPage++; loadCustomers()">次 ▶</button>
+  </div>
+</div>
+
+<!-- ===== 来店一覧 ===== -->
+<div id="tab-visits_tbl" class="page">
+  <div class="section-title">来店一覧（全来店履歴）</div>
+  <div class="search-bar">
+    <select id="visYear" onchange="visPage=1;loadVisits()"><option value="">年（すべて）</option></select>
+    <select id="visType" onchange="visPage=1;loadVisits()"><option value="">種類（すべて）</option></select>
+    <select id="visStatus" onchange="visPage=1;loadVisits()">
+      <option value="">ステータス（すべて）</option>
+      <option value="確定">確定</option><option value="キャンセル">キャンセル</option>
+    </select>
+  </div>
+  <div class="count-label" id="visCount"></div>
+  <div class="tbl-wrap"><table id="tblVis">
+    <thead><tr><th>日付</th><th>曜</th><th>時間</th><th>お名前</th><th>撮影種類</th><th>カメラマン</th><th>ステータス</th><th>子供年齢</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <div class="pagination">
+    <button id="visPrev" onclick="visPage--;loadVisits()">◀ 前</button>
+    <span class="pg-info" id="visPgInfo"></span>
+    <button id="visNext" onclick="visPage++;loadVisits()">次 ▶</button>
+  </div>
+</div>
+
+<!-- Chart.js (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// =============================================
+// 設定
+// =============================================
+// 本番: CloudflareワーカーのURL を入れる
+// 開発: http://localhost:8787
+const API = window.location.hostname === 'localhost'
+  ? 'http://localhost:8787'
+  : 'https://lifestudio-api.amaretto.workers.dev';
+
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = '#334155';
+Chart.defaults.font.family = "'Segoe UI', sans-serif";
+
+const COLORS = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#f97316','#14b8a6','#84cc16','#a855f7','#0ea5e9'];
+const STATUS_COLOR = {'確定':'#10b981','キャンセル':'#ef4444','変更':'#f59e0b','仮':'#6366f1','完了':'#06b6d4'};
+
+// =============================================
+// ユーティリティ
+// =============================================
+const charts = {};
+const tabInited = {};
+let custPage = 1, visPage = 1;
+let dashData = null;
+
+function debounce(fn, ms) {
+  let t;
+  return function() { clearTimeout(t); t = setTimeout(() => { custPage=1; fn(); }, ms); };
+}
+
+function showTab(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (!tabInited[name] && dashData) { initTab(name, dashData); }
+}
+
+function bar(id, labels, data, opts = {}) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: opts.colors || labels.map((_, i) => COLORS[i % COLORS.length]), borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#1e293b' }, ticks: { maxRotation: opts.rotate || 0, font: { size: opts.fs || 12 } } },
+        y: { grid: { color: '#334155' }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function doughnut(id, labels, data) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data, backgroundColor: COLORS.slice(0, data.length), borderWidth: 2, borderColor: '#1e293b' }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 11 }, padding: 8 } },
+        tooltip: { callbacks: { label: c => { const t = c.dataset.data.reduce((a,b)=>a+b,0); return ` ${c.raw}件 (${Math.round(c.raw/t*100)}%)`; } } }
+      }
+    }
+  });
+}
+
+// =============================================
+// データ取得
+// =============================================
+async function refreshData() {
+  document.getElementById('loader').classList.remove('hidden');
+  await loadDashboard();
+  document.getElementById('loader').classList.add('hidden');
+}
+
+async function loadDashboard() {
+  const d = await fetch(`${API}/api/dashboard`).then(r => r.json());
+  dashData = d;
+
+  // KPI
+  const k = d.kpi;
+  document.getElementById('k1').textContent = k.total_customers?.toLocaleString() || '-';
+  document.getElementById('k2').textContent = k.total_visits?.toLocaleString() || '-';
+  document.getElementById('k3').textContent = k.total_customers ? Math.round(k.repeater_count / k.total_customers * 100) + '%' : '-';
+  document.getElementById('k4').textContent = k.avg_visits || '-';
+  document.getElementById('k5').textContent = k.avg_children || '-';
+  document.getElementById('k6').textContent = k.confirmed_visits?.toLocaleString() || '-';
+  if (d.generated) document.getElementById('genDate').textContent = '最終更新: ' + d.generated.slice(0,10);
+
+  // アクティブタブのチャート初期化
+  const activeTab = document.querySelector('.page.active')?.id?.replace('tab-','');
+  if (activeTab) initTab(activeTab, d);
+
+  // フィルター用のドロップダウンを設定
+  setupFilters(d);
+}
+
+function setupFilters(d) {
+  const types = d.by_type.map(r => r.shoot_type);
+  const custTypeEl = document.getElementById('custType');
+  const visTypeEl = document.getElementById('visType');
+  custTypeEl.innerHTML = '<option value="">撮影種類（すべて）</option>';
+  visTypeEl.innerHTML = '<option value="">種類（すべて）</option>';
+  types.forEach(t => {
+    custTypeEl.innerHTML += `<option value="${t}">${t}</option>`;
+    visTypeEl.innerHTML += `<option value="${t}">${t}</option>`;
+  });
+
+  // 年フィルター（来店一覧）
+  const visYearEl = document.getElementById('visYear');
+  visYearEl.innerHTML = '<option value="">年（すべて）</option>';
+  const years = [...new Set(Object.keys(d.by_month).map(k => k.split('-')[0]))].sort().reverse();
+  years.forEach(y => { visYearEl.innerHTML += `<option value="${y}">${y}年</option>`; });
+}
+
+// =============================================
+// タブごとのチャート初期化（遅延）
+// =============================================
+function initTab(name, d) {
+  if (tabInited[name]) return;
+  tabInited[name] = true;
+
+  requestAnimationFrame(() => {
+    if (name === 'visit') initVisit(d);
+    else if (name === 'shoot') initShoot(d);
+    else if (name === 'child') initChild(d);
+    else if (name === 'repeat') initRepeat(d);
+    else if (name === 'area') initArea(d);
+    else if (name === 'customers') { custPage=1; loadCustomers(); }
+    else if (name === 'visits_tbl') { visPage=1; loadVisits(); }
+  });
+}
+
+// 来店分析
+function initVisit(d) {
+  const months = Object.keys(d.by_month).sort();
+  bar('cMonthly', months, months.map(k => d.by_month[k] || 0), { rotate: 45, fs: 10 });
+
+  const DOW = ['月','火','水','木','金','土','日'];
+  bar('cDow', DOW, DOW.map(k => d.by_dow[k] || 0), {
+    colors: ['#6366f1','#6366f1','#6366f1','#6366f1','#6366f1','#f59e0b','#f59e0b']
+  });
+
+  const hours = Object.keys(d.by_hour).sort();
+  bar('cHour', hours.map(h => h + '時'), hours.map(h => d.by_hour[h] || 0));
+
+  const vKeys = Object.keys(d.visit_dist).map(Number).sort((a,b)=>a-b);
+  bar('cVisitDist', vKeys.map(k => k === 10 ? '10+回' : k + '回'), vKeys.map(k => d.visit_dist[k] || 0));
+}
+
+// 撮影種類
+function initShoot(d) {
+  doughnut('cShootType', d.by_type.map(r=>r.shoot_type), d.by_type.map(r=>r.cnt));
+  bar('cPhoto', d.by_photographer.map(r=>r.photographer), d.by_photographer.map(r=>r.cnt), { rotate:45, fs:10 });
+
+  // トレンド
+  const trendMap = {};
+  const typeSet = new Set();
+  d.type_trend.forEach(r => {
+    typeSet.add(r.shoot_type);
+    if (!trendMap[r.shoot_type]) trendMap[r.shoot_type] = {};
+    trendMap[r.shoot_type][r.ym] = r.cnt;
+  });
+  const months = [...new Set(d.type_trend.map(r=>r.ym))].sort().slice(-18);
+  const topTypes = [...typeSet].slice(0,5);
+  if (charts['cTypeTrend']) charts['cTypeTrend'].destroy();
+  charts['cTypeTrend'] = new Chart(document.getElementById('cTypeTrend'), {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: topTypes.map((t,i) => ({
+        label: t, data: months.map(m => trendMap[t]?.[m] || 0),
+        borderColor: COLORS[i], backgroundColor: COLORS[i]+'33', fill:false, tension:.3, pointRadius:3
+      }))
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:11}}}},
+      scales:{x:{grid:{color:'#1e293b'},ticks:{maxRotation:45,font:{size:10}}},y:{beginAtZero:true,grid:{color:'#334155'}}}
+    }
+  });
+
+  const stKeys = Object.keys(d.by_status);
+  bar('cStatus', stKeys, stKeys.map(k=>d.by_status[k]), {
+    colors: stKeys.map(k => STATUS_COLOR[k] || '#6366f1')
+  });
+}
+
+// 子供分析
+function initChild(d) {
+  const ages = Array.from({length:13},(_,i)=>i);
+  bar('cChildAge', ages.map(a=>a+'歳'), ages.map(a=>d.child_age[a]||0));
+
+  // 0歳の子をもつ顧客の月齢（child1_age=0 から birthday を計算は別途必要）
+  // ここでは年齢=0の子供数を月ごとに仮表示
+  const months0 = Array.from({length:13},(_,i)=>i);
+  bar('cChildAge0', months0.map(m=>m+'ヶ月'), months0.map(m => d.child_age[0] ? Math.round(d.child_age[0]/12) : 0));
+
+  doughnut('cGender', ['男の子','女の子'], [d.child_gender['男']||0, d.child_gender['女']||0]);
+
+  const ncKeys = Object.keys(d.num_children).map(Number).sort((a,b)=>a-b);
+  doughnut('cNumKids', ncKeys.map(k=>k+'人'), ncKeys.map(k=>d.num_children[k]||0));
+
+  const bm = Array.from({length:12},(_,i)=>i+1);
+  bar('cBirthMonth', ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+    bm.map(m=>d.birth_month[m]||0), {colors:Array(12).fill('#ec4899')});
+}
+
+// リピーター
+function initRepeat(d) {
+  const k = d.kpi;
+  const repeaterCount = k.repeater_count || 0;
+  const newCount = k.total_customers - repeaterCount;
+  doughnut('cRepeater', ['リピーター','新規'], [repeaterCount, newCount]);
+
+  // 撮影種類別リピーター比率（仮データ - Workerから追加クエリが必要）
+  const top5 = d.by_type.slice(0,5);
+  if (charts['cRepeatType']) charts['cRepeatType'].destroy();
+  charts['cRepeatType'] = new Chart(document.getElementById('cRepeatType'), {
+    type: 'bar',
+    data: {
+      labels: top5.map(r=>r.shoot_type),
+      datasets: [{ label:'来店数', data: top5.map(r=>r.cnt), backgroundColor:'#6366f1', borderRadius:4 }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{grid:{color:'#1e293b'}},y:{beginAtZero:true,grid:{color:'#334155'}}}}
+  });
+
+  // リピーターテーブル
+  const tbody = document.querySelector('#tblRepeat tbody');
+  tbody.innerHTML = '';
+  d.repeat_customers.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${c.mother_name}</td><td><span class="chip blue">${c.total_visits}回</span></td><td style="font-size:11px">${c.shoot_types||''}</td><td style="font-size:11px">${c.child1_name||''}${c.child1_age!=null?'('+c.child1_age+'歳)':''}</td><td style="font-size:11px">${c.city||''}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// 地域分析
+function initArea(d) {
+  bar('cCity', d.by_city.map(r=>r.city), d.by_city.map(r=>r.cnt), {rotate:45, fs:11});
+  bar('cZip', d.by_zip.map(r=>r.zip3), d.by_zip.map(r=>r.cnt), {rotate:45});
+}
+
+// =============================================
+// 顧客一覧 API
+// =============================================
+async function loadCustomers() {
+  const q = document.getElementById('custQ').value;
+  const type = document.getElementById('custType').value;
+  const rep = document.getElementById('custRep').value;
+  const url = `${API}/api/customers?page=${custPage}&q=${encodeURIComponent(q)}&type=${encodeURIComponent(type)}&repeater=${rep}`;
+  const d = await fetch(url).then(r => r.json());
+
+  document.getElementById('custCount').textContent = `${d.total.toLocaleString()}件 / ページ ${custPage}`;
+  const tbody = document.querySelector('#tblCust tbody');
+  tbody.innerHTML = '';
+  d.customers.forEach(c => {
+    const child = c.child1_name ? `${c.child1_name}(${c.child1_age??'?'}歳)` : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${c.mother_name||''}</td><td style="font-size:12px">${c.phone||''}</td><td style="font-size:12px">${c.city||''}</td><td style="font-size:12px">${child}</td><td><span class="chip blue">${c.total_visits}回</span></td><td style="font-size:11px">${c.shoot_types||''}</td><td>${c.is_repeater?'<span class="chip green">リピーター</span>':''}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  const totalPages = Math.ceil(d.total / d.limit);
+  document.getElementById('custPgInfo').textContent = `${custPage} / ${totalPages}ページ`;
+  document.getElementById('custPrev').disabled = custPage <= 1;
+  document.getElementById('custNext').disabled = custPage >= totalPages;
+}
+
+// =============================================
+// 来店一覧 API
+// =============================================
+async function loadVisits() {
+  const year = document.getElementById('visYear').value;
+  const type = document.getElementById('visType').value;
+  const status = document.getElementById('visStatus').value;
+  const url = `${API}/api/visits?page=${visPage}&year=${year}&type=${encodeURIComponent(type)}&status=${encodeURIComponent(status)}`;
+  const d = await fetch(url).then(r => r.json());
+
+  document.getElementById('visCount').textContent = `${d.total.toLocaleString()}件 / ページ ${visPage}`;
+  const tbody = document.querySelector('#tblVis tbody');
+  tbody.innerHTML = '';
+  d.visits.forEach(v => {
+    const sc = v.status==='確定'?'green':v.status==='キャンセル'?'red':'yellow';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${v.visit_date||''}</td><td>${v.visit_dow||''}</td><td>${v.visit_time||''}</td><td>${v.mother_name||''}</td><td><span class="chip purple" style="font-size:11px">${v.shoot_type||''}</span></td><td style="font-size:11px">${v.photographer||''}</td><td><span class="chip ${sc}">${v.status||''}</span></td><td style="font-size:11px">${v.child1_age!=null&&v.child1_age!==''?v.child1_age+'歳':''}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  const totalPages = Math.ceil(d.total / d.limit);
+  document.getElementById('visPgInfo').textContent = `${visPage} / ${totalPages}ページ`;
+  document.getElementById('visPrev').disabled = visPage <= 1;
+  document.getElementById('visNext').disabled = visPage >= totalPages;
+}
+
+// =============================================
+// 初期化
+// =============================================
+window.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await loadDashboard();
+  } catch(e) {
+    document.querySelector('.load-text').textContent = 'エラー: ' + e.message;
+    return;
+  }
+  document.getElementById('loader').classList.add('hidden');
+});
+</script>
+</body>
+</html>

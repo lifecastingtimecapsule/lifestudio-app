@@ -1,0 +1,7 @@
+node_modules/
+.wrangler/
+*.env
+.env
+data.json
+*.sql
+dist/
