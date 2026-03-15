@@ -5,10 +5,12 @@
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
   'Cache-Control': 'public, max-age=300', // 5分キャッシュ
 };
+
+const IMPORT_SECRET = 'ls-import-2024';
 
 export default {
   async fetch(request, env) {
@@ -36,6 +38,9 @@ export default {
         const type = url.searchParams.get('type') || '';
         const status = url.searchParams.get('status') || '';
         return await getVisits(env.DB, page, year, type, status);
+      }
+      if (path === '/api/import' && request.method === 'POST') {
+        return await importData(env.DB, request);
       }
       return new Response('Not Found', { status: 404 });
     } catch (e) {
@@ -266,4 +271,64 @@ async function getVisits(db, page, year, type, status) {
     total: countRow.total,
     page, limit,
   }), { headers: { ...CORS, 'Content-Type': 'application/json' } });
+}
+
+// ============================================================
+// データインポート（ブラウザスクレイパーから直接書き込み）
+// ============================================================
+async function importData(db, request) {
+  const headers = { ...CORS, 'Content-Type': 'application/json' };
+  let body;
+  try { body = await request.json(); } catch (e) {
+    return new Response(JSON.stringify({ error: 'invalid JSON' }), { status: 400, headers });
+  }
+  if (body.secret !== IMPORT_SECRET) {
+    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers });
+  }
+
+  const customers = body.customers || [];
+  const visits = body.visits || [];
+  let custInserted = 0, visitInserted = 0;
+
+  // Insert customers in batches of 10
+  for (let i = 0; i < customers.length; i += 10) {
+    const chunk = customers.slice(i, i + 10);
+    const stmts = chunk.map(c => db.prepare(
+      `INSERT OR REPLACE INTO customers
+       (e_seq,mother_name,father_name,phone,email,zip_code,prefecture,city,
+        is_repeater,num_children,total_visits,shoot_types,
+        child1_name,child1_gender,child1_birthday,child1_age,
+        child2_name,child2_gender,child2_birthday,child2_age,
+        child3_name,child3_gender,child3_birthday,child3_age)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    ).bind(
+      c.eseq, c.motherName, c.fatherName, c.phone, c.email,
+      c.zipCode, c.prefecture, c.city, c.isRepeater, c.numChildren,
+      c.totalVisits, c.shootTypes,
+      c.child1Name, c.child1Gender, c.child1Birthday, c.child1Age,
+      c.child2Name, c.child2Gender, c.child2Birthday, c.child2Age,
+      c.child3Name, c.child3Gender, c.child3Birthday, c.child3Age
+    ));
+    await db.batch(stmts);
+    custInserted += chunk.length;
+  }
+
+  // Insert visits in batches of 10
+  for (let i = 0; i < visits.length; i += 10) {
+    const chunk = visits.slice(i, i + 10);
+    const stmts = chunk.map(v => db.prepare(
+      `INSERT OR IGNORE INTO visits
+       (e_seq,mother_name,visit_date,visit_time,visit_dow,visit_month,visit_year,
+        branch,shoot_type,photographer,status,note)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+    ).bind(
+      v.eseq, v.motherName, v.visitDate, v.visitTime, v.visitDow,
+      v.visitMonth, v.visitYear, v.branch, v.shootType,
+      v.photographer, v.status, v.note
+    ));
+    await db.batch(stmts);
+    visitInserted += chunk.length;
+  }
+
+  return new Response(JSON.stringify({ ok: true, custInserted, visitInserted }), { headers });
 }

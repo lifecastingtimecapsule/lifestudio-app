@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Cloudflare Worker (wrangler dev)",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["wrangler", "dev"],
+      "port": 8787,
+      "cwd": "${workspaceFolder}/worker"
+    }
+  ]
+}
